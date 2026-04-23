@@ -18,8 +18,6 @@ html, body { height: 100%; width: 100%; font-family: Arial, sans-serif; backgrou
 .tree { flex: 1; overflow-y: auto; padding: 14px; }
 .tree::-webkit-scrollbar { width: 6px; }
 .tree::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-
-/* Items */
 .node { margin: 4px 0; }
 .row { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 6px; border: 2px solid; cursor: default; transition: opacity 0.15s; }
 .row:hover { opacity: 0.88; }
@@ -41,8 +39,6 @@ html, body { height: 100%; width: 100%; font-family: Arial, sans-serif; backgrou
 .kids { margin-left: 22px; }
 .kids.hide { display: none; }
 .empty-msg { text-align: center; color: #94a3b8; padding: 30px 10px; font-size: 14px; line-height: 1.8; }
-
-/* Modal */
 .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 999; }
 .overlay.on { display: flex; }
 .box { background: white; padding: 22px; border-radius: 10px; width: 92%; max-width: 380px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); animation: pop 0.2s ease; }
@@ -59,8 +55,6 @@ html, body { height: 100%; width: 100%; font-family: Arial, sans-serif; backgrou
 .cancel:hover { background: #cbd5e1; }
 .del-ok { background: #dc2626; color: white; }
 .del-ok:hover { background: #b91c1c; }
-
-/* Toast */
 .toast { position: fixed; bottom: 20px; right: 20px; padding: 11px 18px; border-radius: 6px; color: white; font-size: 14px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: slideup 0.3s ease; z-index: 9999; }
 .toast.ok { background: #16a34a; }
 .toast.err { background: #dc2626; }
@@ -83,19 +77,17 @@ html, body { height: 100%; width: 100%; font-family: Arial, sans-serif; backgrou
   </div>
 </div>
 
-<!-- Add/Edit Modal -->
 <div class="overlay" id="inputOverlay">
   <div class="box">
     <h3 id="inputTitle">New Item</h3>
     <input type="text" id="inputVal" placeholder="Enter name..." />
     <div class="row-btns">
       <button class="cancel" onclick="closeAdd()">Cancel</button>
-      <button class="ok" onclick="submitItem()">Create</button>
+      <button class="ok" id="submitBtn" onclick="submitItem()">Create</button>
     </div>
   </div>
 </div>
 
-<!-- Delete Modal -->
 <div class="overlay" id="delOverlay">
   <div class="box">
     <h3>Delete Item?</h3>
@@ -108,177 +100,219 @@ html, body { height: 100%; width: 100%; font-family: Arial, sans-serif; backgrou
 </div>
 
 <script>
-// ─── State ────────────────────────────────────────────────
-let items    = JSON.parse(localStorage.getItem('td') || '[]');
-let nid      = parseInt(localStorage.getItem('nid') || '1');
-let exMap    = JSON.parse(localStorage.getItem('ex') || '{}');
-let addPid   = null;
-let editId   = null;
-let delId    = null;
+// ─── Migration: load old format if exists ─────────────────
+function migrateOldData() {
+    // Try old format keys: 'treeData' + 'nextId' + 'expanded'
+    const oldRaw = localStorage.getItem('treeData');
+    if (!oldRaw) return null;
+
+    try {
+        const oldItems = JSON.parse(oldRaw);
+        if (!Array.isArray(oldItems) || oldItems.length === 0) return null;
+
+        // Convert old format {id, title, parentId} to new {id, title, pid}
+        const converted = oldItems.map(i => ({
+            id:    i.id,
+            title: i.title,
+            pid:   i.parentId !== undefined ? i.parentId : (i.pid !== undefined ? i.pid : null)
+        }));
+
+        const oldNextId = parseInt(localStorage.getItem('nextId') || '1');
+        const oldExp    = JSON.parse(localStorage.getItem('expanded') || localStorage.getItem('expandedIds') || '{}');
+
+        // Convert expanded: could be array or object
+        let expObj = {};
+        if (Array.isArray(oldExp)) {
+            oldExp.forEach(id => { expObj[id] = true; });
+        } else {
+            expObj = oldExp;
+        }
+
+        // Save in new format
+        localStorage.setItem('td',  JSON.stringify(converted));
+        localStorage.setItem('nid', oldNextId);
+        localStorage.setItem('ex',  JSON.stringify(expObj));
+
+        // Clean up old keys
+        localStorage.removeItem('treeData');
+        localStorage.removeItem('nextId');
+        localStorage.removeItem('expanded');
+        localStorage.removeItem('expandedIds');
+
+        console.log('✅ Migrated', converted.length, 'items from old format');
+        return { items: converted, nid: oldNextId, ex: expObj };
+    } catch(e) {
+        console.warn('Migration failed:', e);
+        return null;
+    }
+}
+
+// ─── Load State ───────────────────────────────────────────
+const migrated = migrateOldData();
+
+let items = migrated ? migrated.items  : JSON.parse(localStorage.getItem('td')  || '[]');
+let nid   = migrated ? migrated.nid    : parseInt(localStorage.getItem('nid')   || '1');
+let exMap = migrated ? migrated.ex     : JSON.parse(localStorage.getItem('ex')  || '{}');
+
+let addPid = null;
+let editId = null;
+let delId  = null;
 
 // ─── Persist ──────────────────────────────────────────────
 function persist() {
-  localStorage.setItem('td',  JSON.stringify(items));
-  localStorage.setItem('nid', nid);
-  localStorage.setItem('ex',  JSON.stringify(exMap));
+    localStorage.setItem('td',  JSON.stringify(items));
+    localStorage.setItem('nid', nid);
+    localStorage.setItem('ex',  JSON.stringify(exMap));
 }
 
 // ─── Toast ────────────────────────────────────────────────
 function toast(msg, type) {
-  const t = document.createElement('div');
-  t.className = 'toast ' + (type || 'ok');
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2800);
+    const t = document.createElement('div');
+    t.className = 'toast ' + (type || 'ok');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2800);
 }
 
 // ─── Toggle expand ────────────────────────────────────────
 function toggle(id) {
-  exMap[id] = !exMap[id];
-  persist();
-  render();
+    exMap[id] = !exMap[id];
+    persist();
+    render();
 }
 
-// ─── Open add/edit modal ──────────────────────────────────
+// ─── Add / Edit modal ─────────────────────────────────────
 function openAdd(pid) {
-  addPid  = pid;
-  editId  = null;
-  document.getElementById('inputTitle').textContent = pid == null ? 'New Main Item' : 'New Child Item';
-  document.getElementById('inputVal').value = '';
-  document.getElementById('inputOverlay').classList.add('on');
-  setTimeout(() => document.getElementById('inputVal').focus(), 80);
+    addPid = pid;
+    editId = null;
+    document.getElementById('inputTitle').textContent = pid == null ? 'New Main Item' : 'New Child Item';
+    document.getElementById('inputVal').value = '';
+    document.getElementById('submitBtn').textContent = 'Create';
+    document.getElementById('inputOverlay').classList.add('on');
+    setTimeout(() => document.getElementById('inputVal').focus(), 80);
 }
 
 function openEdit(id) {
-  editId = id;
-  addPid = null;
-  const item = items.find(i => i.id === id);
-  document.getElementById('inputTitle').textContent = 'Edit Item';
-  document.getElementById('inputVal').value = item.title;
-  document.getElementById('inputOverlay').classList.add('on');
-  setTimeout(() => document.getElementById('inputVal').focus(), 80);
+    editId = id;
+    addPid = null;
+    const item = items.find(i => i.id === id);
+    document.getElementById('inputTitle').textContent = 'Edit Item';
+    document.getElementById('inputVal').value = item.title;
+    document.getElementById('submitBtn').textContent = 'Save';
+    document.getElementById('inputOverlay').classList.add('on');
+    setTimeout(() => document.getElementById('inputVal').focus(), 80);
 }
 
 function closeAdd() {
-  document.getElementById('inputOverlay').classList.remove('on');
+    document.getElementById('inputOverlay').classList.remove('on');
 }
 
 function submitItem() {
-  const val = document.getElementById('inputVal').value.trim();
-  if (!val) { toast('Enter a name', 'err'); return; }
+    const val = document.getElementById('inputVal').value.trim();
+    if (!val) { toast('Enter a name', 'err'); return; }
 
-  if (editId != null) {
-    items.find(i => i.id === editId).title = val;
-    toast('✓ Updated');
-  } else {
-    items.push({ id: nid++, title: val, pid: addPid });
-    if (addPid != null) exMap[addPid] = true;
-    toast('✓ Created');
-  }
-  persist();
-  render();
-  closeAdd();
+    if (editId != null) {
+        items.find(i => i.id === editId).title = val;
+        toast('✓ Updated');
+    } else {
+        items.push({ id: nid++, title: val, pid: addPid });
+        if (addPid != null) exMap[addPid] = true;
+        toast('✓ Created');
+    }
+    persist();
+    render();
+    closeAdd();
 }
 
-// ─── Open delete modal ────────────────────────────────────
+// ─── Delete modal ─────────────────────────────────────────
 function openDel(id) {
-  delId = id;
-  const item = items.find(i => i.id === id);
-  document.getElementById('delMsg').textContent = 'Delete "' + item.title + '" and all children?';
-  document.getElementById('delOverlay').classList.add('on');
+    delId = id;
+    const item = items.find(i => i.id === id);
+    document.getElementById('delMsg').textContent = 'Delete "' + item.title + '" and all children?';
+    document.getElementById('delOverlay').classList.add('on');
 }
 
 function closeDel() {
-  document.getElementById('delOverlay').classList.remove('on');
+    document.getElementById('delOverlay').classList.remove('on');
 }
 
 function submitDel() {
-  const removeTree = (id) => {
-    items.filter(i => i.pid === id).forEach(c => removeTree(c.id));
-    items = items.filter(i => i.id !== id);
-    delete exMap[id];
-  };
-  removeTree(delId);
-  persist();
-  render();
-  toast('✓ Deleted');
-  closeDel();
+    const removeTree = (id) => {
+        items.filter(i => i.pid === id).forEach(c => removeTree(c.id));
+        items = items.filter(i => i.id !== id);
+        delete exMap[id];
+    };
+    removeTree(delId);
+    persist();
+    render();
+    toast('✓ Deleted');
+    closeDel();
 }
 
 // ─── Render ───────────────────────────────────────────────
 function rowClass(level) {
-  if (level === 0) return 'main';
-  if (level === 1) return 'child';
-  return 'deep';
+    if (level === 0) return 'main';
+    if (level === 1) return 'child';
+    return 'deep';
 }
 
 function rowIcon(level) {
-  if (level === 0) return '📁';
-  if (level === 1) return '📄';
-  return '📌';
+    if (level === 0) return '📁';
+    if (level === 1) return '📄';
+    return '📌';
 }
 
 function renderNode(item, level) {
-  const children = items.filter(i => i.pid === item.id);
-  const isOpen   = !!exMap[item.id];
-  const cls      = rowClass(level);
-  const ico      = rowIcon(level);
+    const children = items.filter(i => i.pid === item.id);
+    const isOpen   = !!exMap[item.id];
+    const cls      = rowClass(level);
+    const ico      = rowIcon(level);
 
-  let html = '<div class="node">';
-  html += '<div class="row ' + cls + '">';
-  
-  // arrow or gap
-  if (children.length > 0) {
-    html += '<button class="arrow ' + (isOpen ? 'open' : '') + '" onclick="toggle(' + item.id + ')">▶</button>';
-  } else {
-    html += '<div class="gap"></div>';
-  }
+    let html = '<div class="node">';
+    html += '<div class="row ' + cls + '">';
+    html += children.length
+        ? '<button class="arrow ' + (isOpen ? 'open' : '') + '" onclick="toggle(' + item.id + ')">▶</button>'
+        : '<div class="gap"></div>';
+    html += '<span class="ico">' + ico + '</span>';
+    html += '<span class="lbl">' + item.title + '</span>';
+    html += '<div class="btns">';
+    html += '<button class="ab a" onclick="openAdd('  + item.id + ')">+ Add</button>';
+    html += '<button class="ab e" onclick="openEdit(' + item.id + ')">✎ Edit</button>';
+    html += '<button class="ab d" onclick="openDel('  + item.id + ')">✕ Del</button>';
+    html += '</div></div>';
 
-  html += '<span class="ico">' + ico + '</span>';
-  html += '<span class="lbl">' + item.title + '</span>';
-  html += '<div class="btns">';
-  html += '<button class="ab a" onclick="openAdd(' + item.id + ')">+ Add</button>';
-  html += '<button class="ab e" onclick="openEdit(' + item.id + ')">✎ Edit</button>';
-  html += '<button class="ab d" onclick="openDel(' + item.id + ')">✕ Del</button>';
-  html += '</div>';
-  html += '</div>';
+    if (children.length) {
+        html += '<div class="kids ' + (isOpen ? '' : 'hide') + '">';
+        children.forEach(c => { html += renderNode(c, level + 1); });
+        html += '</div>';
+    }
 
-  if (children.length > 0) {
-    html += '<div class="kids ' + (isOpen ? '' : 'hide') + '">';
-    children.forEach(c => { html += renderNode(c, level + 1); });
     html += '</div>';
-  }
-
-  html += '</div>';
-  return html;
+    return html;
 }
 
 function render() {
-  const roots = items.filter(i => i.pid == null);
-  const el    = document.getElementById('tree');
-
-  if (roots.length === 0) {
-    el.innerHTML = '<div class="empty-msg">No items yet<br>Click <b>+ Add Main Item</b> to start</div>';
-  } else {
-    el.innerHTML = roots.map(r => renderNode(r, 0)).join('');
-  }
+    const roots = items.filter(i => i.pid == null);
+    const el    = document.getElementById('tree');
+    if (roots.length === 0) {
+        el.innerHTML = '<div class="empty-msg">No items yet<br>Click <b>+ Add Main Item</b> to start</div>';
+    } else {
+        el.innerHTML = roots.map(r => renderNode(r, 0)).join('');
+    }
 }
 
-// ─── Global keyboard / click ──────────────────────────────
+// ─── Events ───────────────────────────────────────────────
 document.getElementById('inputVal').addEventListener('keydown', e => {
-  if (e.key === 'Enter') submitItem();
-  if (e.key === 'Escape') closeAdd();
+    if (e.key === 'Enter')  submitItem();
+    if (e.key === 'Escape') closeAdd();
 });
-
 document.getElementById('inputOverlay').addEventListener('click', e => {
-  if (e.target.id === 'inputOverlay') closeAdd();
+    if (e.target.id === 'inputOverlay') closeAdd();
 });
-
 document.getElementById('delOverlay').addEventListener('click', e => {
-  if (e.target.id === 'delOverlay') closeDel();
+    if (e.target.id === 'delOverlay') closeDel();
 });
 
-// ─── Boot ─────────────────────────────────────────────────
 render();
 </script>
 </body>
