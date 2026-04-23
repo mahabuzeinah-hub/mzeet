@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tree Explorer - Hierarchical Data Viewer</title>
+    
+    <!-- React & ReactDOM from CDN -->
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/react.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/react-dom.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0f766e;
+            --primary-dark: #0d5a50;
+            --primary-light: #14b8a6;
+            --accent: #ec4899;
+            --accent-light: #f472b6;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #94a3b8;
+            --border: #e2e8f0;
+            --border-dark: #cbd5e1;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --warning: #ca8a04;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+        }
+
+        body {
+            font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        #root {
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Main Container */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            background: var(--bg-primary);
+        }
+
+        /* Header */
+        .header {
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: var(--shadow-lg);
+            border-bottom: 3px solid var(--primary-light);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        /* Main Content */
+        .main-content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .tree-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Controls Panel */
+        .controls-panel {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-primary);
+        }
+
+        .btn-add-root {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-add-root:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-add-root:active {
+            transform: translateY(0);
+        }
+
+        /* Tree View */
+        .tree-view {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            scroll-behavior: smooth;
+        }
+
+        .tree-view::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .tree-view::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        .tree-view::-webkit-scrollbar-thumb {
+            background: var(--border-dark);
+            border-radius: 4px;
+        }
+
+        .tree-view::-webkit-scrollbar-thumb:hover {
+            background: var(--text-tertiary);
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-tertiary);
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        /* Tree Item */
+        .tree-item {
+            margin-bottom: 0.5rem;
+            animation: slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .tree-item-content {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            gap: 0.75rem;
+            position: relative;
+        }
+
+        .tree-item-content:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--border-dark);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .tree-item-content.has-children {
+            cursor: default;
+        }
+
+        /* Toggle Button */
+        .toggle-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            padding: 0;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .toggle-btn:hover {
+            color: var(--primary);
+        }
+
+        .toggle-btn svg {
+            width: 18px;
+            height: 18px;
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .toggle-btn.expanded svg {
+            transform: rotate(90deg);
+        }
+
+        .toggle-placeholder {
+            width: 24px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        /* Icons */
+        .icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-folder {
+            color: var(--primary-light);
+        }
+
+        .icon-file {
+            color: var(--text-tertiary);
+        }
+
+        /* Title */
+        .tree-item-title {
+            flex: 1;
+            font-weight: 500;
+            color: var(--text-primary);
+            word-break: break-word;
+            transition: all 0.2s ease;
+        }
+
+        /* Inline Edit */
+        .tree-item-input {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border: 2px solid var(--primary);
+            border-radius: 0.375rem;
+            font-family: inherit;
+            font-size: inherit;
+            color: var(--text-primary);
+            outline: none;
+            background: white;
+            transition: all 0.2s ease;
+        }
+
+        .tree-item-input:focus {
+            box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+        }
+
+        /* Actions */
+        .tree-item-actions {
+            display: flex;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .tree-item-content:hover .tree-item-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            padding: 0.4rem 0.6rem;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .action-btn-add {
+            background: var(--primary-light);
+            color: white;
+        }
+
+        .action-btn-add:hover {
+            background: var(--primary);
+        }
+
+        .action-btn-edit {
+            background: var(--warning);
+            color: white;
+        }
+
+        .action-btn-edit:hover {
+            background: #b8860b;
+        }
+
+        .action-btn-delete {
+            background: var(--danger);
+            color: white;
+        }
+
+        .action-btn-delete:hover {
+            background: #991b1b;
+        }
+
+        /* Children Container */
+        .tree-children {
+            margin-left: 1.5rem;
+            margin-top: 0.5rem;
+            max-height: 1000px;
+            overflow: hidden;
+            animation: expandDown 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .tree-children.collapsed {
+            max-height: 0;
+            animation: collapseUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes expandDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                max-height: 1000px;
+            }
+        }
+
+        @keyframes collapseUp {
+            from {
+                opacity: 1;
+                max-height: 1000px;
+            }
+            to {
+                opacity: 0;
+                max-height: 0;
+            }
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: var(--shadow-xl);
+            animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: 0.5rem;
+            font-family: inherit;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            transition: all 0.2s ease;
+            color: var(--text-primary);
+        }
+
+        .modal-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.95rem;
+        }
+
+        .modal-btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .modal-btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .modal-btn-secondary:hover {
+            background: var(--border);
+        }
+
+        /* Confirmation Modal */
+        .modal-message {
+            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Status Messages */
+        .status-message {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            box-shadow: var(--shadow-lg);
+            animation: slideInUp 0.3s ease;
+            z-index: 999;
+        }
+
+        @keyframes slideInUp {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .status-success {
+            background: var(--success);
+        }
+
+        .status-error {
+            background: var(--danger);
+        }
+
+        .status-info {
+            background: var(--primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                max-height: 50%;
+            }
+
+            .main-content {
+                flex-direction: column;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .header {
+                padding: 1.5rem;
+            }
+
+            .tree-view {
+                padding: 1rem;
+            }
+
+            .tree-children {
+                margin-left: 1rem;
+            }
+
+            .action-btn {
+                padding: 0.3rem 0.4rem;
+                font-size: 0.7rem;
+            }
+
+            .status-message {
+                right: 1rem;
+                left: 1rem;
+                bottom: 1rem;
+            }
+        }
+
+        /* Loading State */
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Transitions */
+        * {
+            transition: background-color 0.2s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCYH3S0fK-B6x2_U6UVybyn3Zlcl_a486w",
+            authDomain: "mzeet-f3fb8.firebaseapp.com",
+            projectId: "mzeet-f3fb8",
+            databaseURL: "https://mzeet-f3fb8-default-rtdb.firebaseio.com",
+            storageBucket: "mzeet-f3fb8.firebasestorage.app",
+            messagingSenderId: "598805088587",
+            appId: "1:598805088587:web:dc0ab0501ff25beee5c0ce",
+            measurementId: "G-178Y5DDYQJ"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.getDatabase(app);
+
+        // UUID Generator
+        const generateId = () => {
+            return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        };
+
+        // Confirmation Modal Component
+        const ConfirmModal = ({ title, message, onConfirm, onCancel }) => (
+            <div className="modal-overlay" onClick={onCancel}>
+                <div className="modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="modal-title">{title}</div>
+                    <div className="modal-message">{message}</div>
+                    <div className="modal-buttons">
+                        <button className="modal-btn modal-btn-secondary" onClick={onCancel}>
+                            Cancel
+                        </button>
+                        <button className="modal-btn modal-btn-primary" onClick={onConfirm} style={{background: 'var(--danger)'}}>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+        // Input Modal Component
+        const InputModal = ({ title, placeholder, onSubmit, onCancel, defaultValue = '' }) => {
+            const [value, setValue] = useState(defaultValue);
+            const inputRef = useRef(null);
+
+            useEffect(() => {
+                inputRef.current?.focus();
+            }, []);
+
+            const handleSubmit = () => {
+                if (value.trim()) {
+                    onSubmit(value.trim());
+                }
+            };
+
+            return (
+                <div className="modal-overlay" onClick={onCancel}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="modal-title">{title}</div>
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            className="modal-input"
+                            placeholder={placeholder}
+                            value={value}
+                            onChange={e => setValue(e.target.value)}
+                            onKeyPress={e => e.key === 'Enter' && handleSubmit()}
+                        />
+                        <div className="modal-buttons">
+                            <button className="modal-btn modal-btn-secondary" onClick={onCancel}>
+                                Cancel
+                            </button>
+                            <button className="modal-btn modal-btn-primary" onClick={handleSubmit}>
+                                Create
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Status Message Component
+        const StatusMessage = ({ message, type, onClose }) => {
+            useEffect(() => {
+                const timer = setTimeout(onClose, 3000);
+                return () => clearTimeout(timer);
+            }, [onClose]);
+
+            return (
+                <div className={`status-message status-${type}`}>
+                    {message}
+                </div>
+            );
+        };
+
+        // Tree Item Component
+        const TreeItem = ({ item, onAdd, onEdit, onDelete, onToggle }) => {
+            const [isExpanded, setIsExpanded] = useState(false);
+            const [isEditing, setIsEditing] = useState(false);
+            const [editValue, setEditValue] = useState(item.title);
+            const [children, setChildren] = useState([]);
+            const [loading, setLoading] = useState(false);
+
+            // Load children
+            useEffect(() => {
+                if (!isExpanded) return;
+
+                setLoading(true);
+                const childRef = firebase.database().ref('tree').orderByChild('parentId').equalTo(item.id);
+                
+                const unsubscribe = childRef.on('value', snapshot => {
+                    const data = snapshot.val();
+                    if (data) {
+                        setChildren(Object.values(data));
+                    } else {
+                        setChildren([]);
+                    }
+                    setLoading(false);
+                });
+
+                return () => childRef.off('value', unsubscribe);
+            }, [isExpanded, item.id]);
+
+            const handleToggle = () => {
+                setIsExpanded(!isExpanded);
+                onToggle(item.id, !isExpanded);
+            };
+
+            const handleSaveEdit = () => {
+                if (editValue.trim() && editValue !== item.title) {
+                    onEdit(item.id, editValue.trim());
+                }
+                setIsEditing(false);
+                setEditValue(item.title);
+            };
+
+            const hasChildren = item.childCount > 0;
+
+            return (
+                <div className="tree-item">
+                    <div className="tree-item-content">
+                        {hasChildren ? (
+                            <button 
+                                className={`toggle-btn ${isExpanded ? 'expanded' : ''}`}
+                                onClick={handleToggle}
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        ) : (
+                            <div className="toggle-placeholder"></div>
+                        )}
+
+                        <div className="icon icon-folder">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path>
+                            </svg>
+                        </div>
+
+                        {isEditing ? (
+                            <>
+                                <input
+                                    type="text"
+                                    className="tree-item-input"
+                                    value={editValue}
+                                    onChange={e => setEditValue(e.target.value)}
+                                    onKeyPress={e => e.key === 'Enter' && handleSaveEdit()}
+                                    onBlur={handleSaveEdit}
+                                    autoFocus
+                                />
+                            </>
+                        ) : (
+                            <span className="tree-item-title">{item.title}</span>
+                        )}
+
+                        <div className="tree-item-actions">
+                            <button 
+                                className="action-btn action-btn-add"
+                                title="Add child"
+                                onClick={() => onAdd(item.id)}
+                            >
+                                +
+                            </button>
+                            <button 
+                                className="action-btn action-btn-edit"
+                                title="Edit"
+                                onClick={() => setIsEditing(true)}
+                            >
+                                ✎
+                            </button>
+                            <button 
+                                className="action-btn action-btn-delete"
+                                title="Delete"
+                                onClick={() => onDelete(item.id, item.title)}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    </div>
+
+                    {isExpanded && (
+                        <div className={`tree-children ${!isExpanded ? 'collapsed' : ''}`}>
+                            {loading ? (
+                                <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                                    <div className="loading-spinner"></div>
+                                </div>
+                            ) : children.length > 0 ? (
+                                children.map(child => (
+                                    <TreeItem
+                                        key={child.id}
+                                        item={child}
+                                        onAdd={onAdd}
+                                        onEdit={onEdit}
+                                        onDelete={onDelete}
+                                        onToggle={onToggle}
+                                    />
+                                ))
+                            ) : (
+                                <div style={{ padding: '0.75rem 1rem', color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>
+                                    No items
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Main App Component
+        const TreeExplorer = () => {
+            const [items, setItems] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [modal, setModal] = useState(null);
+            const [status, setStatus] = useState(null);
+
+            // Load root items
+            useEffect(() => {
+                const rootRef = firebase.database().ref('tree').orderByChild('parentId').equalTo(null);
+                
+                const unsubscribe = rootRef.on('value', snapshot => {
+                    const data = snapshot.val();
+                    if (data) {
+                        const itemsArray = Object.entries(data).map(([key, value]) => ({
+                            ...value,
+                            childCount: 0
+                        }));
+                        setItems(itemsArray);
+                    } else {
+                        setItems([]);
+                    }
+                    setLoading(false);
+                });
+
+                return () => rootRef.off('value', unsubscribe);
+            }, []);
+
+            // Count children
+            useEffect(() => {
+                const countChildren = async () => {
+                    for (let item of items) {
+                        const childRef = firebase.database().ref('tree').orderByChild('parentId').equalTo(item.id);
+                        childRef.once('value', snapshot => {
+                            item.childCount = snapshot.numChildren();
+                        });
+                    }
+                };
+                countChildren();
+            }, [items]);
+
+            const handleAddRoot = () => {
+                setModal({
+                    type: 'input',
+                    title: 'New Root Item',
+                    placeholder: 'Enter item name...',
+                    onSubmit: async (value) => {
+                        const newItem = {
+                            id: generateId(),
+                            title: value,
+                            parentId: null,
+                            createdAt: new Date().toISOString()
+                        };
+                        
+                        try {
+                            await firebase.database().ref(`tree/${newItem.id}`).set(newItem);
+                            setStatus({ message: 'Item created successfully', type: 'success' });
+                            setModal(null);
+                        } catch (error) {
+                            setStatus({ message: 'Error creating item', type: 'error' });
+                        }
+                    }
+                });
+            };
+
+            const handleAddChild = (parentId) => {
+                setModal({
+                    type: 'input',
+                    title: 'New Child Item',
+                    placeholder: 'Enter item name...',
+                    onSubmit: async (value) => {
+                        const newItem = {
+                            id: generateId(),
+                            title: value,
+                            parentId: parentId,
+                            createdAt: new Date().toISOString()
+                        };
+                        
+                        try {
+                            await firebase.database().ref(`tree/${newItem.id}`).set(newItem);
+                            setStatus({ message: 'Child item created successfully', type: 'success' });
+                            setModal(null);
+                        } catch (error) {
+                            setStatus({ message: 'Error creating item', type: 'error' });
+                        }
+                    }
+                });
+            };
+
+            const handleEdit = async (itemId, newTitle) => {
+                try {
+                    await firebase.database().ref(`tree/${itemId}`).update({ title: newTitle });
+                    setStatus({ message: 'Item updated successfully', type: 'success' });
+                } catch (error) {
+                    setStatus({ message: 'Error updating item', type: 'error' });
+                }
+            };
+
+            const handleDelete = (itemId, itemTitle) => {
+                setModal({
+                    type: 'confirm',
+                    title: 'Delete Item?',
+                    message: `Are you sure you want to delete "${itemTitle}"? This action cannot be undone.`,
+                    onConfirm: async () => {
+                        try {
+                            // Delete the item and all its children
+                            const deleteRecursively = async (id) => {
+                                const childRef = firebase.database().ref('tree').orderByChild('parentId').equalTo(id);
+                                const snapshot = await childRef.once('value');
+                                
+                                if (snapshot.exists()) {
+                                    for (let child of Object.values(snapshot.val())) {
+                                        await deleteRecursively(child.id);
+                                    }
+                                }
+                                
+                                await firebase.database().ref(`tree/${id}`).remove();
+                            };
+
+                            await deleteRecursively(itemId);
+                            setStatus({ message: 'Item deleted successfully', type: 'success' });
+                            setModal(null);
+                        } catch (error) {
+                            setStatus({ message: 'Error deleting item', type: 'error' });
+                        }
+                    }
+                });
+            };
+
+            return (
+                <div className="app-container">
+                    <style>{`
+                        body {
+                            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+                        }
+                    `}</style>
+
+                    {/* Header */}
+                    <div style={{ width: '100%', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100 }}>
+                        <div className="header">
+                            <h1>🌳 Tree Explorer</h1>
+                            <p>Hierarchical Data Management with Real-time Sync</p>
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="main-content" style={{ marginTop: '120px' }}>
+                        {/* Sidebar */}
+                        <div className="sidebar">
+                            <div className="controls-panel">
+                                <button className="btn-add-root" onClick={handleAddRoot}>
+                                    <span>+</span> Add Root Item
+                                </button>
+                            </div>
+
+                            {/* Tree View */}
+                            <div className="tree-container">
+                                <div className="tree-view">
+                                    {loading ? (
+                                        <div className="empty-state">
+                                            <div className="loading-spinner"></div>
+                                            <p>Loading items...</p>
+                                        </div>
+                                    ) : items.length === 0 ? (
+                                        <div className="empty-state">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                                            </svg>
+                                            <p>No items yet. Create your first item!</p>
+                                        </div>
+                                    ) : (
+                                        items.map(item => (
+                                            <TreeItem
+                                                key={item.id}
+                                                item={item}
+                                                onAdd={handleAddChild}
+                                                onEdit={handleEdit}
+                                                onDelete={handleDelete}
+                                                onToggle={() => {}}
+                                            />
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Modals */}
+                    {modal && (
+                        modal.type === 'input' ? (
+                            <InputModal
+                                title={modal.title}
+                                placeholder={modal.placeholder}
+                                onSubmit={modal.onSubmit}
+                                onCancel={() => setModal(null)}
+                            />
+                        ) : (
+                            <ConfirmModal
+                                title={modal.title}
+                                message={modal.message}
+                                onConfirm={modal.onConfirm}
+                                onCancel={() => setModal(null)}
+                            />
+                        )
+                    )}
+
+                    {/* Status Messages */}
+                    {status && (
+                        <StatusMessage
+                            message={status.message}
+                            type={status.type}
+                            onClose={() => setStatus(null)}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        // Render App
+        ReactDOM.createRoot(document.getElementById('root')).render(<TreeExplorer />);
+    </script>
+</body>
+</html>
