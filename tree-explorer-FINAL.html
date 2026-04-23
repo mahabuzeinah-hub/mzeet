@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tree Explorer</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0f766e;
+            --primary-dark: #0d5a50;
+            --primary-light: #14b8a6;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-tertiary: #94a3b8;
+            --border: #e2e8f0;
+            --danger: #dc2626;
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            color: var(--text-primary);
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: var(--bg-primary);
+        }
+
+        .header {
+            padding: 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: var(--shadow-lg);
+            border-bottom: 3px solid var(--primary-light);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .controls {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-primary);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .tree-view {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .tree-view::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .tree-view::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        .empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-tertiary);
+            text-align: center;
+        }
+
+        .tree-item {
+            margin-bottom: 0.5rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .item-content {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .item-content:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--text-secondary);
+        }
+
+        .toggle {
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 1rem;
+            padding: 0;
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle.expanded {
+            transform: rotate(90deg);
+        }
+
+        .placeholder {
+            width: 24px;
+            flex-shrink: 0;
+        }
+
+        .icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            color: var(--primary-light);
+            font-size: 1rem;
+        }
+
+        .title {
+            flex: 1;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .input {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border: 2px solid var(--primary);
+            border-radius: 0.375rem;
+            font-family: inherit;
+            font-size: inherit;
+            color: var(--text-primary);
+            outline: none;
+        }
+
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .item-content:hover .actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            padding: 0.4rem 0.6rem;
+            border: none;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-weight: 600;
+            color: white;
+        }
+
+        .btn-add {
+            background: var(--primary-light);
+        }
+
+        .btn-add:hover {
+            background: var(--primary);
+        }
+
+        .btn-edit {
+            background: #ca8a04;
+        }
+
+        .btn-edit:hover {
+            background: #a16207;
+        }
+
+        .btn-delete {
+            background: var(--danger);
+        }
+
+        .btn-delete:hover {
+            background: #991b1b;
+        }
+
+        .children {
+            margin-left: 1.5rem;
+            margin-top: 0.5rem;
+            max-height: 1000px;
+            overflow: hidden;
+            animation: expand 0.3s ease;
+        }
+
+        .children.hidden {
+            max-height: 0;
+            animation: collapse 0.3s ease;
+        }
+
+        @keyframes expand {
+            from {
+                opacity: 0;
+                max-height: 0;
+            }
+            to {
+                opacity: 1;
+                max-height: 1000px;
+            }
+        }
+
+        @keyframes collapse {
+            from {
+                opacity: 1;
+                max-height: 1000px;
+            }
+            to {
+                opacity: 0;
+                max-height: 0;
+            }
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-box {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border);
+            border-radius: 0.5rem;
+            font-family: inherit;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+        }
+
+        .modal-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .modal-btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .modal-btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.3s ease;
+            z-index: 999;
+        }
+
+        .toast-success {
+            background: #16a34a;
+        }
+
+        .toast-error {
+            background: var(--danger);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                max-height: 50%;
+            }
+
+            .main {
+                flex-direction: column;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .children {
+                margin-left: 1rem;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <h1>🌳 Tree Explorer</h1>
+            <p>Simple Hierarchical Data Manager</p>
+        </div>
+
+        <div class="main">
+            <div class="sidebar">
+                <div class="controls">
+                    <button class="btn" id="addRootBtn">+ Add Item</button>
+                </div>
+
+                <div class="tree-view" id="treeView">
+                    <div class="empty">No items yet. Click the button above!</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for input -->
+    <div id="inputModal" class="modal hidden" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-title" id="modalTitle">New Item</div>
+            <input type="text" class="modal-input" id="modalInput" placeholder="Enter item name...">
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-secondary" id="modalCancel">Cancel</button>
+                <button class="modal-btn modal-btn-primary" id="modalCreate">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for confirm delete -->
+    <div id="confirmModal" class="modal hidden" style="display: none;">
+        <div class="modal-box">
+            <div class="modal-title">Delete Item?</div>
+            <p id="confirmMessage" style="margin-bottom: 1.5rem; color: var(--text-secondary);">Are you sure?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-secondary" id="confirmCancel">Cancel</button>
+                <button class="modal-btn modal-btn-primary" id="confirmDelete" style="background: var(--danger);">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast toast-success hidden" style="display: none;"></div>
+
+    <script>
+        // Data storage
+        let treeData = JSON.parse(localStorage.getItem('treeData')) || [];
+        let nextId = parseInt(localStorage.getItem('nextId')) || 1;
+
+        // DOM elements
+        const treeView = document.getElementById('treeView');
+        const addRootBtn = document.getElementById('addRootBtn');
+        const inputModal = document.getElementById('inputModal');
+        const confirmModal = document.getElementById('confirmModal');
+        const modalInput = document.getElementById('modalInput');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalCreate = document.getElementById('modalCreate');
+        const modalCancel = document.getElementById('modalCancel');
+        const confirmDelete = document.getElementById('confirmDelete');
+        const confirmCancel = document.getElementById('confirmCancel');
+        const toast = document.getElementById('toast');
+
+        // Modal state
+        let currentParentId = null;
+        let currentEditId = null;
+        let currentDeleteId = null;
+
+        // Save data
+        function saveData() {
+            localStorage.setItem('treeData', JSON.stringify(treeData));
+        }
+
+        // Show toast
+        function showToast(message, type = 'success') {
+            toast.textContent = message;
+            toast.className = `toast toast-${type}`;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 3000);
+        }
+
+        // Show input modal
+        function showInputModal(parentId = null, itemId = null) {
+            currentParentId = parentId;
+            currentEditId = itemId;
+            
+            if (itemId) {
+                const item = treeData.find(i => i.id === itemId);
+                modalTitle.textContent = 'Edit Item';
+                modalInput.value = item.title;
+            } else {
+                modalTitle.textContent = parentId ? 'New Child Item' : 'New Item';
+                modalInput.value = '';
+            }
+            
+            inputModal.style.display = 'flex';
+            modalInput.focus();
+        }
+
+        // Hide input modal
+        function hideInputModal() {
+            inputModal.style.display = 'none';
+        }
+
+        // Show confirm modal
+        function showConfirmModal(itemId) {
+            const item = treeData.find(i => i.id === itemId);
+            currentDeleteId = itemId;
+            document.getElementById('confirmMessage').textContent = `Delete "${item.title}"?`;
+            confirmModal.style.display = 'flex';
+        }
+
+        // Hide confirm modal
+        function hideConfirmModal() {
+            confirmModal.style.display = 'none';
+        }
+
+        // Add or edit item
+        function handleCreate() {
+            const title = modalInput.value.trim();
+            if (!title) return;
+
+            if (currentEditId) {
+                // Edit
+                const item = treeData.find(i => i.id === currentEditId);
+                item.title = title;
+                showToast('✅ Item updated');
+            } else {
+                // Create
+                const newItem = {
+                    id: nextId++,
+                    title: title,
+                    parentId: currentParentId
+                };
+                treeData.push(newItem);
+                localStorage.setItem('nextId', nextId);
+                showToast('✅ Item created');
+            }
+
+            saveData();
+            renderTree();
+            hideInputModal();
+        }
+
+        // Delete item
+        function handleDelete() {
+            const deleteChildren = (id) => {
+                treeData = treeData.filter(item => {
+                    if (item.id === id) return false;
+                    if (item.parentId === id) {
+                        deleteChildren(item.id);
+                    }
+                    return true;
+                });
+            };
+
+            deleteChildren(currentDeleteId);
+            saveData();
+            renderTree();
+            showToast('✅ Item deleted');
+            hideConfirmModal();
+        }
+
+        // Render tree
+        function renderTree() {
+            const rootItems = treeData.filter(item => item.parentId == null);
+            
+            if (rootItems.length === 0) {
+                treeView.innerHTML = '<div class="empty">No items yet. Click the button above!</div>';
+                return;
+            }
+
+            treeView.innerHTML = rootItems.map(item => renderItem(item)).join('');
+            attachEventListeners();
+        }
+
+        // Render single item
+        function renderItem(item, level = 0) {
+            const children = treeData.filter(i => i.parentId === item.id);
+            const hasChildren = children.length > 0;
+
+            return `
+                <div class="tree-item">
+                    <div class="item-content">
+                        ${hasChildren ? `
+                            <button class="toggle" data-id="${item.id}">▶</button>
+                        ` : `
+                            <div class="placeholder"></div>
+                        `}
+                        <div class="icon">📁</div>
+                        <div class="title" data-id="${item.id}">${escapeHtml(item.title)}</div>
+                        <div class="actions">
+                            <button class="action-btn btn-add" data-add="${item.id}">+</button>
+                            <button class="action-btn btn-edit" data-edit="${item.id}">✎</button>
+                            <button class="action-btn btn-delete" data-delete="${item.id}">✕</button>
+                        </div>
+                    </div>
+                    ${hasChildren ? `
+                        <div class="children" data-parent="${item.id}">
+                            ${children.map(child => renderItem(child, level + 1)).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // Attach event listeners
+        function attachEventListeners() {
+            // Toggle expand/collapse
+            document.querySelectorAll('.toggle').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const id = btn.dataset.id;
+                    const childrenDiv = document.querySelector(`[data-parent="${id}"]`);
+                    if (childrenDiv) {
+                        btn.classList.toggle('expanded');
+                        childrenDiv.classList.toggle('hidden');
+                    }
+                });
+            });
+
+            // Add child
+            document.querySelectorAll('[data-add]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showInputModal(parseInt(btn.dataset.add));
+                });
+            });
+
+            // Edit
+            document.querySelectorAll('[data-edit]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showInputModal(null, parseInt(btn.dataset.edit));
+                });
+            });
+
+            // Delete
+            document.querySelectorAll('[data-delete]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showConfirmModal(parseInt(btn.dataset.delete));
+                });
+            });
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listeners
+        addRootBtn.addEventListener('click', () => showInputModal());
+        modalCreate.addEventListener('click', handleCreate);
+        modalCancel.addEventListener('click', hideInputModal);
+        confirmDelete.addEventListener('click', handleDelete);
+        confirmCancel.addEventListener('click', hideConfirmModal);
+
+        // Modal click outside to close
+        inputModal.addEventListener('click', (e) => {
+            if (e.target === inputModal) hideInputModal();
+        });
+        confirmModal.addEventListener('click', (e) => {
+            if (e.target === confirmModal) hideConfirmModal();
+        });
+
+        // Enter key in input
+        modalInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleCreate();
+        });
+
+        // Initial render
+        renderTree();
+    </script>
+</body>
+</html>
