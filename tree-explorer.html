@@ -6,261 +6,279 @@
 <title>Tree Explorer</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { height: 100%; width: 100%; }
-body { font-family: Arial; background: #f5f5f5; }
-.header { background: #0f766e; color: white; padding: 20px; }
-.header h1 { margin: 0; font-size: 24px; }
-.header p { font-size: 12px; opacity: 0.9; }
-.container { display: flex; height: calc(100vh - 80px); }
-.sidebar { width: 100%; background: white; display: flex; flex-direction: column; }
-.controls { padding: 15px; border-bottom: 1px solid #ddd; flex-shrink: 0; }
-.tree { flex: 1; overflow-y: auto; padding: 15px; }
-.btn { width: 100%; padding: 10px; background: #0f766e; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-.btn:hover { background: #0d5a50; }
+html, body { height: 100%; width: 100%; font-family: Arial, sans-serif; background: #f1f5f9; }
+.header { background: linear-gradient(135deg, #0f766e, #0d5a50); color: white; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.header h1 { font-size: 22px; font-weight: bold; }
+.header p { font-size: 12px; opacity: 0.85; margin-top: 4px; }
+.page { display: flex; height: calc(100vh - 72px); }
+.panel { width: 100%; background: white; display: flex; flex-direction: column; overflow: hidden; }
+.top { padding: 14px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; background: #f8fafc; }
+.add-btn { width: 100%; padding: 10px; background: #0f766e; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+.add-btn:hover { background: #0d5a50; }
+.tree { flex: 1; overflow-y: auto; padding: 14px; }
+.tree::-webkit-scrollbar { width: 6px; }
+.tree::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
-.item-wrapper { margin: 5px 0; }
-.item { padding: 10px; border-radius: 4px; display: flex; align-items: center; gap: 8px; border: 2px solid transparent; }
-.item.main { background: linear-gradient(135deg, #e0f7f4, #d4f4f1); border-color: #0f766e; color: #0f766e; font-weight: bold; }
-.item.child { background: linear-gradient(135deg, #fef3c7, #fde68a); border-color: #f59e0b; color: #92400e; }
-.item:hover { opacity: 0.85; }
+/* Items */
+.node { margin: 4px 0; }
+.row { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 6px; border: 2px solid; cursor: default; transition: opacity 0.15s; }
+.row:hover { opacity: 0.88; }
+.row.main { background: linear-gradient(90deg, #e0f7f4, #d4f4f1); border-color: #0f766e; color: #064e3b; font-weight: 600; }
+.row.child { background: linear-gradient(90deg, #fef3c7, #fde68a); border-color: #d97706; color: #78350f; }
+.row.deep { background: linear-gradient(90deg, #ede9fe, #ddd6fe); border-color: #7c3aed; color: #4c1d95; }
+.arrow { width: 20px; height: 20px; background: none; border: none; cursor: pointer; font-size: 13px; padding: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; color: inherit; }
+.arrow.open { transform: rotate(90deg); }
+.gap { width: 20px; flex-shrink: 0; }
+.ico { font-size: 15px; flex-shrink: 0; }
+.lbl { flex: 1; font-size: 14px; word-break: break-word; }
+.btns { display: none; gap: 4px; flex-shrink: 0; }
+.row:hover .btns { display: flex; }
+.ab { padding: 3px 7px; border: none; border-radius: 3px; cursor: pointer; color: white; font-size: 11px; font-weight: bold; }
+.ab:hover { opacity: 0.8; }
+.ab.a { background: #0d9488; }
+.ab.e { background: #b45309; }
+.ab.d { background: #dc2626; }
+.kids { margin-left: 22px; }
+.kids.hide { display: none; }
+.empty-msg { text-align: center; color: #94a3b8; padding: 30px 10px; font-size: 14px; line-height: 1.8; }
 
-.toggle { width: 20px; height: 20px; background: none; border: none; cursor: pointer; font-size: 14px; padding: 0; transition: transform 0.2s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.toggle.open { transform: rotate(90deg); }
-.space { width: 20px; flex-shrink: 0; }
-.icon { font-size: 16px; flex-shrink: 0; }
-.title { flex: 1; word-break: break-word; }
-.actions { display: flex; gap: 4px; flex-shrink: 0; }
-.action { padding: 3px 6px; border: none; border-radius: 3px; cursor: pointer; color: white; font-weight: bold; font-size: 11px; }
-.add { background: #14b8a6; }
-.edit { background: #ca8a04; }
-.delete { background: #dc2626; }
-.action:hover { opacity: 0.8; }
+/* Modal */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 999; }
+.overlay.on { display: flex; }
+.box { background: white; padding: 22px; border-radius: 10px; width: 92%; max-width: 380px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); animation: pop 0.2s ease; }
+@keyframes pop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.box h3 { font-size: 17px; font-weight: bold; color: #0f766e; margin-bottom: 14px; }
+.box p { color: #475569; font-size: 14px; margin-bottom: 16px; }
+.box input { width: 100%; padding: 10px; border: 1.5px solid #cbd5e1; border-radius: 5px; font-size: 14px; margin-bottom: 16px; font-family: Arial; }
+.box input:focus { outline: none; border-color: #0f766e; box-shadow: 0 0 0 3px rgba(15,118,110,0.1); }
+.row-btns { display: flex; gap: 10px; }
+.row-btns button { flex: 1; padding: 9px; border: none; border-radius: 5px; font-weight: bold; font-size: 14px; cursor: pointer; }
+.ok { background: #0f766e; color: white; }
+.ok:hover { background: #0d5a50; }
+.cancel { background: #e2e8f0; color: #334155; }
+.cancel:hover { background: #cbd5e1; }
+.del-ok { background: #dc2626; color: white; }
+.del-ok:hover { background: #b91c1c; }
 
-.children { margin-left: 20px; }
-.children.hidden { display: none !important; }
-
-.empty { color: #999; text-align: center; padding: 20px; }
-
-.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
-.modal.show { display: flex; }
-.modal-box { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 400px; }
-.modal-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #0f766e; }
-.modal-input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 15px; font-family: Arial; font-size: 14px; }
-.modal-buttons { display: flex; gap: 10px; }
-.modal-btn { flex: 1; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
-.primary { background: #0f766e; color: white; }
-.secondary { background: #e5e5e5; }
-.danger { background: #dc2626; color: white; }
-
-.toast { position: fixed; bottom: 20px; right: 20px; background: #16a34a; color: white; padding: 12px 20px; border-radius: 4px; animation: slideUp 0.3s; }
-.toast.error { background: #dc2626; }
-@keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+/* Toast */
+.toast { position: fixed; bottom: 20px; right: 20px; padding: 11px 18px; border-radius: 6px; color: white; font-size: 14px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: slideup 0.3s ease; z-index: 9999; }
+.toast.ok { background: #16a34a; }
+.toast.err { background: #dc2626; }
+@keyframes slideup { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>
 </head>
 <body>
+
 <div class="header">
-<h1>🌳 Tree Explorer</h1>
-<p>Blue = Main Items | Yellow = Child Items</p>
+  <h1>🌳 Tree Explorer</h1>
+  <p>🔵 Blue = Main &nbsp;|&nbsp; 🟡 Yellow = Child &nbsp;|&nbsp; 🟣 Purple = Sub-child</p>
 </div>
 
-<div class="container">
-<div class="sidebar">
-<div class="controls">
-<button class="btn" onclick="addRoot()">+ Add Main Item</button>
-</div>
-<div class="tree" id="tree"></div>
-</div>
-</div>
-
-<div id="inputModal" class="modal">
-<div class="modal-box">
-<div class="modal-title" id="modalTitle">New Item</div>
-<input type="text" class="modal-input" id="modalInput" placeholder="Enter name...">
-<div class="modal-buttons">
-<button class="modal-btn secondary" onclick="closeInput()">Cancel</button>
-<button class="modal-btn primary" onclick="createItem()">Create</button>
-</div>
-</div>
+<div class="page">
+  <div class="panel">
+    <div class="top">
+      <button class="add-btn" onclick="openAdd(null)">+ Add Main Item</button>
+    </div>
+    <div class="tree" id="tree"></div>
+  </div>
 </div>
 
-<div id="confirmModal" class="modal">
-<div class="modal-box">
-<div class="modal-title">Delete Item?</div>
-<p id="confirmText" style="margin-bottom: 15px; color: #666;"></p>
-<div class="modal-buttons">
-<button class="modal-btn secondary" onclick="closeConfirm()">Cancel</button>
-<button class="modal-btn danger" onclick="confirmDelete()">Delete</button>
+<!-- Add/Edit Modal -->
+<div class="overlay" id="inputOverlay">
+  <div class="box">
+    <h3 id="inputTitle">New Item</h3>
+    <input type="text" id="inputVal" placeholder="Enter name..." />
+    <div class="row-btns">
+      <button class="cancel" onclick="closeAdd()">Cancel</button>
+      <button class="ok" onclick="submitItem()">Create</button>
+    </div>
+  </div>
 </div>
-</div>
+
+<!-- Delete Modal -->
+<div class="overlay" id="delOverlay">
+  <div class="box">
+    <h3>Delete Item?</h3>
+    <p id="delMsg"></p>
+    <div class="row-btns">
+      <button class="cancel" onclick="closeDel()">Cancel</button>
+      <button class="del-ok" onclick="submitDel()">Delete</button>
+    </div>
+  </div>
 </div>
 
 <script>
-let data = JSON.parse(localStorage.getItem('treeData')) || [];
-let nextId = parseInt(localStorage.getItem('nextId')) || 1;
-let expanded = JSON.parse(localStorage.getItem('expanded')) || {};
-let currentParentId = null;
-let currentEditId = null;
-let currentDeleteId = null;
+// ─── State ────────────────────────────────────────────────
+let items    = JSON.parse(localStorage.getItem('td') || '[]');
+let nid      = parseInt(localStorage.getItem('nid') || '1');
+let exMap    = JSON.parse(localStorage.getItem('ex') || '{}');
+let addPid   = null;
+let editId   = null;
+let delId    = null;
 
-function save() {
-    localStorage.setItem('treeData', JSON.stringify(data));
-    localStorage.setItem('nextId', nextId);
-    localStorage.setItem('expanded', JSON.stringify(expanded));
+// ─── Persist ──────────────────────────────────────────────
+function persist() {
+  localStorage.setItem('td',  JSON.stringify(items));
+  localStorage.setItem('nid', nid);
+  localStorage.setItem('ex',  JSON.stringify(exMap));
 }
 
-function toast(msg, type = 'success') {
-    const el = document.createElement('div');
-    el.className = 'toast' + (type === 'error' ? ' error' : '');
-    el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 3000);
+// ─── Toast ────────────────────────────────────────────────
+function toast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type || 'ok');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2800);
 }
 
-function addRoot() {
-    currentParentId = null;
-    currentEditId = null;
-    document.getElementById('modalTitle').textContent = 'New Main Item';
-    document.getElementById('modalInput').value = '';
-    document.getElementById('inputModal').classList.add('show');
-    document.getElementById('modalInput').focus();
+// ─── Toggle expand ────────────────────────────────────────
+function toggle(id) {
+  exMap[id] = !exMap[id];
+  persist();
+  render();
 }
 
-function addChild(id) {
-    currentParentId = id;
-    currentEditId = null;
-    expanded[id] = true;
-    document.getElementById('modalTitle').textContent = 'New Child Item';
-    document.getElementById('modalInput').value = '';
-    document.getElementById('inputModal').classList.add('show');
-    document.getElementById('modalInput').focus();
+// ─── Open add/edit modal ──────────────────────────────────
+function openAdd(pid) {
+  addPid  = pid;
+  editId  = null;
+  document.getElementById('inputTitle').textContent = pid == null ? 'New Main Item' : 'New Child Item';
+  document.getElementById('inputVal').value = '';
+  document.getElementById('inputOverlay').classList.add('on');
+  setTimeout(() => document.getElementById('inputVal').focus(), 80);
 }
 
-function editItem(id) {
-    const item = data.find(i => i.id === id);
-    currentEditId = id;
-    currentParentId = null;
-    document.getElementById('modalTitle').textContent = 'Edit Item';
-    document.getElementById('modalInput').value = item.title;
-    document.getElementById('inputModal').classList.add('show');
-    document.getElementById('modalInput').focus();
+function openEdit(id) {
+  editId = id;
+  addPid = null;
+  const item = items.find(i => i.id === id);
+  document.getElementById('inputTitle').textContent = 'Edit Item';
+  document.getElementById('inputVal').value = item.title;
+  document.getElementById('inputOverlay').classList.add('on');
+  setTimeout(() => document.getElementById('inputVal').focus(), 80);
 }
 
-function createItem() {
-    const title = document.getElementById('modalInput').value.trim();
-    if (!title) { 
-        toast('Enter a name', 'error'); 
-        return; 
-    }
-
-    if (currentEditId) {
-        data.find(i => i.id === currentEditId).title = title;
-        toast('✓ Updated');
-    } else {
-        data.push({ id: nextId++, title, parentId: currentParentId });
-        toast('✓ Created');
-    }
-    save();
-    render();
-    closeInput();
+function closeAdd() {
+  document.getElementById('inputOverlay').classList.remove('on');
 }
 
-function deleteItem(id) {
-    const item = data.find(i => i.id === id);
-    currentDeleteId = id;
-    document.getElementById('confirmText').textContent = 'Delete "' + item.title + '" and all its children?';
-    document.getElementById('confirmModal').classList.add('show');
+function submitItem() {
+  const val = document.getElementById('inputVal').value.trim();
+  if (!val) { toast('Enter a name', 'err'); return; }
+
+  if (editId != null) {
+    items.find(i => i.id === editId).title = val;
+    toast('✓ Updated');
+  } else {
+    items.push({ id: nid++, title: val, pid: addPid });
+    if (addPid != null) exMap[addPid] = true;
+    toast('✓ Created');
+  }
+  persist();
+  render();
+  closeAdd();
 }
 
-function confirmDelete() {
-    const del = (id) => {
-        data = data.filter(i => {
-            if (i.id === id) {
-                delete expanded[id];
-                return false;
-            }
-            if (i.parentId === id) del(i.id);
-            return true;
-        });
-    };
-    del(currentDeleteId);
-    save();
-    render();
-    toast('✓ Deleted');
-    closeConfirm();
+// ─── Open delete modal ────────────────────────────────────
+function openDel(id) {
+  delId = id;
+  const item = items.find(i => i.id === id);
+  document.getElementById('delMsg').textContent = 'Delete "' + item.title + '" and all children?';
+  document.getElementById('delOverlay').classList.add('on');
 }
 
-function closeInput() {
-    document.getElementById('inputModal').classList.remove('show');
+function closeDel() {
+  document.getElementById('delOverlay').classList.remove('on');
 }
 
-function closeConfirm() {
-    document.getElementById('confirmModal').classList.remove('show');
+function submitDel() {
+  const removeTree = (id) => {
+    items.filter(i => i.pid === id).forEach(c => removeTree(c.id));
+    items = items.filter(i => i.id !== id);
+    delete exMap[id];
+  };
+  removeTree(delId);
+  persist();
+  render();
+  toast('✓ Deleted');
+  closeDel();
 }
 
-function toggleExpand(id) {
-    if (expanded[id]) {
-        expanded[id] = false;
-    } else {
-        expanded[id] = true;
-    }
-    save();
-    render();
+// ─── Render ───────────────────────────────────────────────
+function rowClass(level) {
+  if (level === 0) return 'main';
+  if (level === 1) return 'child';
+  return 'deep';
 }
 
-function renderItem(item, level) {
-    const children = data.filter(i => i.parentId === item.id);
-    const isMain = level === 0;
-    const isExpanded = expanded[item.id] === true;
-    
-    let html = `<div class="item-wrapper">
-<div class="item ${isMain ? 'main' : 'child'}">
-    ${children.length ? `<button class="toggle ${isExpanded ? 'open' : ''}" onclick="toggleExpand(${item.id})">▶</button>` : `<div class="space"></div>`}
-    <span class="icon">${isMain ? '📁' : '📄'}</span>
-    <span class="title">${item.title}</span>
-    <div class="actions">
-        <button class="action add" onclick="addChild(${item.id})" title="Add">+</button>
-        <button class="action edit" onclick="editItem(${item.id})" title="Edit">✎</button>
-        <button class="action delete" onclick="deleteItem(${item.id})" title="Delete">✕</button>
-    </div>
-</div>`;
+function rowIcon(level) {
+  if (level === 0) return '📁';
+  if (level === 1) return '📄';
+  return '📌';
+}
 
-    if (children.length) {
-        html += `<div class="children ${isExpanded ? '' : 'hidden'}">`;
-        children.forEach(child => {
-            html += renderItem(child, level + 1);
-        });
-        html += `</div>`;
-    }
-    
-    html += `</div>`;
-    return html;
+function renderNode(item, level) {
+  const children = items.filter(i => i.pid === item.id);
+  const isOpen   = !!exMap[item.id];
+  const cls      = rowClass(level);
+  const ico      = rowIcon(level);
+
+  let html = '<div class="node">';
+  html += '<div class="row ' + cls + '">';
+  
+  // arrow or gap
+  if (children.length > 0) {
+    html += '<button class="arrow ' + (isOpen ? 'open' : '') + '" onclick="toggle(' + item.id + ')">▶</button>';
+  } else {
+    html += '<div class="gap"></div>';
+  }
+
+  html += '<span class="ico">' + ico + '</span>';
+  html += '<span class="lbl">' + item.title + '</span>';
+  html += '<div class="btns">';
+  html += '<button class="ab a" onclick="openAdd(' + item.id + ')">+ Add</button>';
+  html += '<button class="ab e" onclick="openEdit(' + item.id + ')">✎ Edit</button>';
+  html += '<button class="ab d" onclick="openDel(' + item.id + ')">✕ Del</button>';
+  html += '</div>';
+  html += '</div>';
+
+  if (children.length > 0) {
+    html += '<div class="kids ' + (isOpen ? '' : 'hide') + '">';
+    children.forEach(c => { html += renderNode(c, level + 1); });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function render() {
-    const root = data.filter(i => !i.parentId);
-    if (root.length === 0) {
-        document.getElementById('tree').innerHTML = '<div class="empty">No items yet<br>Click + Add Main Item to start</div>';
-    } else {
-        let html = '';
-        root.forEach(item => {
-            html += renderItem(item, 0);
-        });
-        document.getElementById('tree').innerHTML = html;
-    }
+  const roots = items.filter(i => i.pid == null);
+  const el    = document.getElementById('tree');
+
+  if (roots.length === 0) {
+    el.innerHTML = '<div class="empty-msg">No items yet<br>Click <b>+ Add Main Item</b> to start</div>';
+  } else {
+    el.innerHTML = roots.map(r => renderNode(r, 0)).join('');
+  }
 }
 
-document.getElementById('modalInput').addEventListener('keypress', e => {
-    if (e.key === 'Enter') createItem();
+// ─── Global keyboard / click ──────────────────────────────
+document.getElementById('inputVal').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitItem();
+  if (e.key === 'Escape') closeAdd();
 });
 
-document.getElementById('inputModal').addEventListener('click', e => {
-    if (e.target.id === 'inputModal') closeInput();
+document.getElementById('inputOverlay').addEventListener('click', e => {
+  if (e.target.id === 'inputOverlay') closeAdd();
 });
 
-document.getElementById('confirmModal').addEventListener('click', e => {
-    if (e.target.id === 'confirmModal') closeConfirm();
+document.getElementById('delOverlay').addEventListener('click', e => {
+  if (e.target.id === 'delOverlay') closeDel();
 });
 
+// ─── Boot ─────────────────────────────────────────────────
 render();
 </script>
 </body>
