@@ -633,9 +633,15 @@
             measurementId: "G-178Y5DDYQJ"
         };
 
-        // Initialize Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        const database = firebase.getDatabase(app);
+        // Initialize Firebase with error handling
+        let database;
+        try {
+            const app = firebase.initializeApp(firebaseConfig);
+            database = firebase.getDatabase(app);
+            console.log('✅ Firebase initialized successfully');
+        } catch (error) {
+            console.error('❌ Firebase initialization error:', error);
+        }
 
         // UUID Generator
         const generateId = () => {
@@ -855,6 +861,31 @@
             const [loading, setLoading] = useState(true);
             const [modal, setModal] = useState(null);
             const [status, setStatus] = useState(null);
+            const [firebaseStatus, setFirebaseStatus] = useState('connecting');
+
+            // Check Firebase connection
+            useEffect(() => {
+                if (!database) {
+                    setFirebaseStatus('error');
+                    setStatus({ message: '⚠️ Firebase not connected. Check console.', type: 'error' });
+                    setLoading(false);
+                    return;
+                }
+
+                // Test Firebase connection
+                const testRef = firebase.database().ref('.info/connected');
+                testRef.on('value', snapshot => {
+                    if (snapshot.val() === true) {
+                        setFirebaseStatus('connected');
+                        console.log('✅ Connected to Firebase');
+                    } else {
+                        setFirebaseStatus('disconnected');
+                        console.log('⚠️ Disconnected from Firebase');
+                    }
+                });
+
+                return () => testRef.off('value');
+            }, []);
 
             // Load root items
             useEffect(() => {
