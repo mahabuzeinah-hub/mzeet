@@ -12,20 +12,21 @@ body { font-family: Arial; background: #f5f5f5; }
 .header h1 { margin: 0; font-size: 24px; }
 .header p { font-size: 12px; opacity: 0.9; }
 .container { display: flex; height: calc(100vh - 80px); }
-.sidebar { width: 100%; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+.sidebar { width: 100%; background: white; display: flex; flex-direction: column; }
 .controls { padding: 15px; border-bottom: 1px solid #ddd; flex-shrink: 0; }
 .tree { flex: 1; overflow-y: auto; padding: 15px; }
 .btn { width: 100%; padding: 10px; background: #0f766e; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
 .btn:hover { background: #0d5a50; }
 
-.item { margin: 5px 0; padding: 10px; border-radius: 4px; display: flex; align-items: center; gap: 8px; border: 2px solid transparent; }
+.item-wrapper { margin: 5px 0; }
+.item { padding: 10px; border-radius: 4px; display: flex; align-items: center; gap: 8px; border: 2px solid transparent; }
 .item.main { background: linear-gradient(135deg, #e0f7f4, #d4f4f1); border-color: #0f766e; color: #0f766e; font-weight: bold; }
 .item.child { background: linear-gradient(135deg, #fef3c7, #fde68a); border-color: #f59e0b; color: #92400e; }
 .item:hover { opacity: 0.85; }
 
-.toggle { width: 20px; height: 20px; background: none; border: none; cursor: pointer; font-size: 14px; padding: 0; transition: transform 0.2s; display: flex; align-items: center; justify-content: center; }
+.toggle { width: 20px; height: 20px; background: none; border: none; cursor: pointer; font-size: 14px; padding: 0; transition: transform 0.2s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .toggle.open { transform: rotate(90deg); }
-.space { width: 20px; }
+.space { width: 20px; flex-shrink: 0; }
 .icon { font-size: 16px; flex-shrink: 0; }
 .title { flex: 1; word-break: break-word; }
 .actions { display: flex; gap: 4px; flex-shrink: 0; }
@@ -35,9 +36,8 @@ body { font-family: Arial; background: #f5f5f5; }
 .delete { background: #dc2626; }
 .action:hover { opacity: 0.8; }
 
-.tree-item { }
 .children { margin-left: 20px; }
-.children.hidden { display: none; }
+.children.hidden { display: none !important; }
 
 .empty { color: #999; text-align: center; padding: 20px; }
 
@@ -97,7 +97,7 @@ body { font-family: Arial; background: #f5f5f5; }
 <script>
 let data = JSON.parse(localStorage.getItem('treeData')) || [];
 let nextId = parseInt(localStorage.getItem('nextId')) || 1;
-let expandedIds = new Set(JSON.parse(localStorage.getItem('expandedIds')) || []);
+let expanded = JSON.parse(localStorage.getItem('expanded')) || {};
 let currentParentId = null;
 let currentEditId = null;
 let currentDeleteId = null;
@@ -105,7 +105,7 @@ let currentDeleteId = null;
 function save() {
     localStorage.setItem('treeData', JSON.stringify(data));
     localStorage.setItem('nextId', nextId);
-    localStorage.setItem('expandedIds', JSON.stringify(Array.from(expandedIds)));
+    localStorage.setItem('expanded', JSON.stringify(expanded));
 }
 
 function toast(msg, type = 'success') {
@@ -128,7 +128,7 @@ function addRoot() {
 function addChild(id) {
     currentParentId = id;
     currentEditId = null;
-    expandedIds.add(id);
+    expanded[id] = true;
     document.getElementById('modalTitle').textContent = 'New Child Item';
     document.getElementById('modalInput').value = '';
     document.getElementById('inputModal').classList.add('show');
@@ -156,11 +156,7 @@ function createItem() {
         data.find(i => i.id === currentEditId).title = title;
         toast('✓ Updated');
     } else {
-        const newId = nextId++;
-        data.push({ id: newId, title, parentId: currentParentId });
-        if (currentParentId) {
-            expandedIds.add(currentParentId);
-        }
+        data.push({ id: nextId++, title, parentId: currentParentId });
         toast('✓ Created');
     }
     save();
@@ -179,7 +175,7 @@ function confirmDelete() {
     const del = (id) => {
         data = data.filter(i => {
             if (i.id === id) {
-                expandedIds.delete(id);
+                delete expanded[id];
                 return false;
             }
             if (i.parentId === id) del(i.id);
@@ -201,11 +197,11 @@ function closeConfirm() {
     document.getElementById('confirmModal').classList.remove('show');
 }
 
-function toggle(id) {
-    if (expandedIds.has(id)) {
-        expandedIds.delete(id);
+function toggleExpand(id) {
+    if (expanded[id]) {
+        expanded[id] = false;
     } else {
-        expandedIds.add(id);
+        expanded[id] = true;
     }
     save();
     render();
@@ -214,22 +210,22 @@ function toggle(id) {
 function renderItem(item, level) {
     const children = data.filter(i => i.parentId === item.id);
     const isMain = level === 0;
-    const isExpanded = expandedIds.has(item.id);
+    const isExpanded = expanded[item.id] === true;
     
-    let html = `<div class="tree-item">
+    let html = `<div class="item-wrapper">
 <div class="item ${isMain ? 'main' : 'child'}">
-    ${children.length ? '<button class="toggle ' + (isExpanded ? 'open' : '') + '" onclick="toggle(' + item.id + ')">▶</button>' : '<div class="space"></div>'}
+    ${children.length ? `<button class="toggle ${isExpanded ? 'open' : ''}" onclick="toggleExpand(${item.id})">▶</button>` : `<div class="space"></div>`}
     <span class="icon">${isMain ? '📁' : '📄'}</span>
     <span class="title">${item.title}</span>
     <div class="actions">
-        <button class="action add" onclick="addChild(' + item.id + ')" title="Add">+</button>
-        <button class="action edit" onclick="editItem(' + item.id + ')" title="Edit">✎</button>
-        <button class="action delete" onclick="deleteItem(' + item.id + ')" title="Delete">✕</button>
+        <button class="action add" onclick="addChild(${item.id})" title="Add">+</button>
+        <button class="action edit" onclick="editItem(${item.id})" title="Edit">✎</button>
+        <button class="action delete" onclick="deleteItem(${item.id})" title="Delete">✕</button>
     </div>
 </div>`;
 
     if (children.length) {
-        html += `<div class="children ${!isExpanded ? 'hidden' : ''}">`;
+        html += `<div class="children ${isExpanded ? '' : 'hidden'}">`;
         children.forEach(child => {
             html += renderItem(child, level + 1);
         });
